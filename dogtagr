@@ -1,0 +1,209 @@
+#!/usr/bin//python
+
+import os
+import sys
+import fnmatch
+import urwid.raw_display
+import urwid
+import mutagen
+from mutagen.easyid3 import EasyID3
+from mutagen.mp3 import MP3
+from mutagen.oggvorbis import OggVorbis
+from mutagen.flac import FLAC
+
+def myglob(folder, pattern):
+	"""Return a possibly-empty list of files in folder that match pattern (case-insensitive)"""
+	return [os.path.abspath(folder + '/' + f) for f in os.listdir(folder) if fnmatch.fnmatch(f.lower(), pattern)]
+
+def find_files(folder):
+	formats = ['mp3', 'ogg', 'flac']
+	files = []
+	for f in formats:
+		files += myglob(folder, '*.' + f)
+	return files
+	
+class Album(urwid.WidgetWrap):
+	def __init__(self):
+		self.items = urwid.SimpleListWalker([
+			urwid.AttrWrap( w, 'default', 'reveal focus' ) for w in [
+				urwid.Divider(" "),
+				urwid.Edit("  Album: "),
+				urwid.Edit("   Year: "),
+				urwid.Edit("  Genre: "),
+				urwid.Divider("=")
+			]]
+		)
+		self.tracks = []
+		self.listbox = urwid.ListBox(self.items)
+		self.top = urwid.Pile(self.items)
+		urwid.WidgetWrap.__init__(self,self.top)
+		
+	def add_track(self, track):
+		self.tracks += [track]
+		self.items[1].set_edit_text(track.get_album_name())
+		self.items[2].set_edit_text(track.get_year())
+		self.items[3].set_edit_text(track.get_genre())
+	
+	def get_album(self):
+		return self.items[1].get_edit_text()
+	
+	def get_year(self):
+		return self.items[2].get_edit_text()
+	
+	def get_genre(self):
+		return self.items[3].get_edit_text()
+
+class Track(urwid.WidgetWrap):
+	def __init__(self, filename, album):
+		self.album = album
+		self.filename = filename
+		if self.filename[-3:] == 'mp3':
+			try:
+				self.m = EasyID3(self.filename)
+			except:
+				self.m = EasyID3()
+		elif self.filename[-3:] == 'ogg':
+			self.m = OggVorbis(self.filename)
+		elif self.filename[-4:] == 'flac':
+			self.m = FLAC(self.filename)
+		else:
+			print 'oops ' + self.filename
+
+		for k in ['tracknumber', 'title', 'artist', 'album', 'date', 'genre']:
+			if not self.m.has_key(k):
+				self.m[k] = ['']
+
+		self.items = urwid.SimpleListWalker([
+			urwid.AttrWrap( w, 'default', 'reveal focus' ) for w in [
+				urwid.Text(u"[0/0] [O:" + unicode(self.m['tracknumber'][0]) + u"] >> " + unicode(self.filename, 'utf-8')),
+				urwid.Edit("  Title: ", self.m['title'][0]),
+				urwid.Edit(" Artist: ", self.m['artist'][0]),
+				urwid.Divider("-")
+			]]
+		)
+		
+		self.album.add_track(self)
+		
+		self.listbox = urwid.ListBox(self.items)
+		self.top = urwid.Pile(self.items)
+		urwid.WidgetWrap.__init__(self,self.top)
+
+	def get_album_name(self):
+		return self.m['album'][0]
+	
+	def get_year(self):
+		return self.m['date'][0]
+		
+	def get_genre(self):
+		try:
+			return self.m['genre'][0]
+		except:
+			return ''
+	
+	def set_track_number(self, n):
+		self.track_number = n
+		self.items[0].set_text("[" + n + "] [O:" + self.m['tracknumber'][0] + "] >> " + unicode(self.filename, 'utf-8'))
+		
+	def get_original_track_number(self):
+		try:
+			track = self.m['tracknumber'][0]
+			if track.find('/'):
+				return int(track.split('/')[0])
+			else:
+				return int(track)
+		except:
+			return 0
+			
+	def save(self):
+		self.m['album']       = self.album.get_album()
+		self.m['date']        = self.album.get_year()
+		self.m['genre']       = self.album.get_genre()
+		self.m['tracknumber'] = self.track_number
+		self.m['title']       = self.items[1].get_edit_text()
+		self.m['artist']      = self.items[2].get_edit_text()
+		self.m.save(self.filename)
+
+class Dogtagr(object):
+	def __init__(self, folder):
+		
+		self.files = find_files(folder)		
+		self.album = Album()
+		self.items = urwid.SimpleListWalker(
+			[self.album] + sorted(
+			                      [Track(f, self.album) for f in self.files],
+			                      key=lambda x: x.get_original_track_number()))
+			
+		for index, item in enumerate(self.items[1:]):
+			item.set_track_number(str(index + 1) + '/' + str(len(self.items) - 1))
+		self.listbox = urwid.ListBox(self.items)
+		self.title   = urwid.Text(' dogtagr 0.1')
+		self.help    = urwid.Text("^X Exit     ^O Save     Move: Page Up/Down")
+		header = urwid.AttrWrap(self.title, 'header')
+		footer = urwid.AttrWrap(self.help,  'footer')
+		
+		self.top = urwid.Frame(self.listbox, header, footer)
+
+	def main(self):
+		self.ui = urwid.raw_display.Screen()
+		self.ui.register_palette([
+			('header', 'dark cyan', 'black', 'standout'),
+			('footer', 'white', 'black', 'standout'),
+			('reveal focus', 'dark red','light gray', 'underline'),
+			('default', 'default', 'default', 'standout')
+			])
+		self.ui.run_wrapper( self.run )
+
+	def run(self):
+		size = self.ui.get_cols_rows()
+
+		while True:
+			self.draw_screen(size)
+			keys = self.ui.get_input()
+			if "ctrl x" in keys:
+				self.ui.stop()
+				break
+			if "ctrl o" in keys:
+				self.save()
+				break
+			if "page down" in keys:
+				widget, pos = self.listbox.get_focus()
+				if pos + 2 > len(self.items) or pos < 1:
+					continue
+				tmp = self.items[pos]
+				self.items[pos] = self.items[pos + 1]
+				self.items[pos + 1] = tmp
+				self.items[pos].set_track_number(str(pos) + '/' + str(len(self.items) - 1))
+				self.items[pos + 1].set_track_number(str(pos + 1) + '/' + str(len(self.items) - 1))
+				self.listbox.set_focus(pos + 1, coming_from='above')
+				continue
+			if "page up" in keys:
+				widget, pos = self.listbox.get_focus()
+				if pos + 1 > len(self.items) or pos < 2:
+					continue
+				tmp = self.items[pos]
+				self.items[pos] = self.items[pos - 1]
+				self.items[pos - 1] = tmp
+				self.items[pos].set_track_number(str(pos) + '/' + str(len(self.items) - 1))
+				self.items[pos - 1].set_track_number(str(pos - 1) + '/' + str(len(self.items) - 1))
+				self.listbox.set_focus(pos - 1, coming_from='below')
+				continue
+
+			for k in keys:
+				if k == "window resize":
+					size = self.ui.get_cols_rows()
+					continue
+				self.top.keypress(size, k)
+	
+	def draw_screen(self, size):
+		canvas = self.top.render(size, focus=True)
+		self.ui.draw_screen(size, canvas)
+
+	def save(self):
+		for item in self.items[1:]:
+			item.save()
+
+if __name__ == '__main__':
+	folder = '.'
+	if len(sys.argv) > 1:
+		folder = sys.argv[1]
+	Dogtagr(folder).main()

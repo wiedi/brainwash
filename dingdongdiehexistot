@@ -1,0 +1,81 @@
+#!/usr/bin//python
+
+import os
+import sys
+import fnmatch
+import mutagen
+from mutagen.easyid3 import EasyID3
+from mutagen.mp3 import MP3
+from mutagen.oggvorbis import OggVorbis
+from mutagen.flac import FLAC
+
+def myglob(folder, pattern):
+	"""Return a possibly-empty list of files in folder that match pattern (case-insensitive)"""
+	return [os.path.abspath(folder + '/' + f) for f in os.listdir(folder) if fnmatch.fnmatch(f.lower(), pattern)]
+
+def find_files(folder):
+	formats = ['mp3', 'ogg', 'flac']
+	files = []
+	for f in formats:
+		files += myglob(folder, '*.' + f)
+	return files
+	
+class Track():
+	def __init__(self, filename):
+		self.filename = filename
+		if self.filename[-3:] == 'mp3':
+			self.m = EasyID3(self.filename)
+		elif self.filename[-3:] == 'ogg':
+			self.m = OggVorbis(self.filename)
+		elif self.filename[-4:] == 'flac':
+			self.m = FLAC(self.filename)
+		else:
+			self.m = None
+			print 'oops ' + self.filename
+
+
+	def get_name_by_tags(self):
+		fn = "%02i-%s - %s.%s" % (
+			self.get_original_track_number(),
+			self.m['artist'][0],
+			self.m['title'][0],
+			self.filename.rpartition('.')[2]
+		)
+		fn = fn.replace('/', '-')
+		return unicode(os.path.dirname(self.filename),'utf-8') + u'/' + unicode(fn)
+
+		
+	def get_original_track_number(self):
+		try:
+			track = self.m['tracknumber'][0]
+			if track.find('/'):
+				return int(track.split('/')[0])
+			else:
+				return int(track)
+		except:
+			return 0
+			
+
+class DingDongDieHexIsTot(object):
+	def __init__(self, folder):
+		self.files = find_files(folder)		
+
+	def main(self):
+		for f in self.files:
+			print f
+			print Track(f).get_name_by_tags()
+
+		answer = raw_input('Correct? [Y|n]').strip()
+                if answer == '' or answer.lower() == 'y':
+			for f in self.files:
+				os.rename(f, Track(f).get_name_by_tags())
+			print 'Done'
+		else:
+			print 'Aborted'
+
+
+if __name__ == '__main__':
+	folder = '.'
+	if len(sys.argv) > 1:
+		folder = sys.argv[1]
+	DingDongDieHexIsTot(folder).main()
