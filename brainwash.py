@@ -229,6 +229,16 @@ class BrainWash:
 			file_mp3])
 		return file_mp3
 
+	def encode_to_flac(self, file_wav):
+		"""Encodes a wav file to flac. Returns the new filename"""
+		file_flac = file_wav[:-3] + 'flac'
+		subprocess.call([
+			'flac',
+			file_wav,
+			'-o',
+			file_flac])
+		return file_flac
+
 	def encode_to_ogg(self, file_wav):
 		"""Encodes a wav file to ogg vorbis. Returns the new filename"""
 		file_ogg = file_wav[:-3] + 'ogg'
@@ -321,8 +331,8 @@ class BrainWash:
 				wav_files = myglob(folder[0], 'tmp-brainwash-*.wav')
 				music_files = []
 				for wav_file in wav_files:
-					music_files +=  [self.encode_to_mp3(wav_file)]
-				folder[1] = '.mp3'
+					music_files +=  [self.encode_to_flac(wav_file)]
+				folder[1] = 'flac'
 						
 			# encode into a nice format
 			if folder[1] not in formats_final:
@@ -334,8 +344,8 @@ class BrainWash:
 						wav_files += [self.decode_to_wav(music_file)]
 				music_files = []
 				for wav_file in wav_files:
-					music_files +=  [self.encode_to_mp3(wav_file)]
-				folder[1] = '.mp3'
+					music_files +=  [self.encode_to_flac(wav_file)]
+				folder[1] = 'flac'
 				# take over the tags?
 
 			print 'Found: ' + folder[0]
