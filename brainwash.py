@@ -95,7 +95,8 @@ def find_releases(puid):
 	(track-no, track, release)
 	for each release that the song appeared on on.
 	"""
-	q = Query()
+	service = get_service()
+	q = Query(service)
 	f = TrackFilter(puid=puid)
 	results = None
 	while results == None:
@@ -154,7 +155,8 @@ class BrainWash:
 					included = 1
 				print u'    %d - %s - %s %s' % (tno, track.title, release.title, ' <=' if included else '')
 
-		q = Query()
+		service = get_service()
+		q = Query(service)
 		i = ReleaseIncludes(
 			artist=True,
 			tracks=True,
@@ -371,7 +373,8 @@ class BrainWash:
  
 				file(join(folder[0], '.mbid'), 'w').write(str(mbid))
 			
-			q = Query()
+			service = get_service()
+			q = Query(service)
 			i = ReleaseIncludes(
 				artist=True,
 				tracks=True,
@@ -474,6 +477,13 @@ class BrainWash:
 		# clean up working copy
 		os.chdir('..')
 		shutil.rmtree('.brainwash-work')
+
+
+def get_service():
+	"""
+	Returns a service object for the mb-query
+	"""
+	return WebService(host='78.46.156.87', port=3000, pathPrefix='/ws')
 
 
 if __name__ == '__main__':
