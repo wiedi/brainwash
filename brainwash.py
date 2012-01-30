@@ -483,7 +483,7 @@ def get_service():
 	"""
 	Returns a service object for the mb-query
 	"""
-	return WebService(host='78.46.156.87', port=3000, pathPrefix='/ws')
+	return WebService(host='musicbrainz.hihn.org', port=3000, pathPrefix='/ws')
 
 
 if __name__ == '__main__':
