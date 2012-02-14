@@ -41,7 +41,7 @@ from mutagen.mp3 import MP3
 from mutagen.oggvorbis import OggVorbis
 from mutagen.flac import FLAC
 import musicdns, musicdns.cache
-from musicbrainz2.webservice import Query, TrackFilter, WebServiceError, ReleaseIncludes
+from musicbrainz2.webservice import Query, TrackFilter, WebService, WebServiceError, ReleaseIncludes
 
 formats = ['.mp3', '.ogg', 'flac', '.wma', '.ape', '.mpc', '.m4a', '.aac', '.wav', '.asf']
 formats_final = ['.mp3', '.ogg', 'flac']
